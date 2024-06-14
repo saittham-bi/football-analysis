@@ -24,7 +24,8 @@ default_args = {
 postgres_conn = BaseHook.get_connection('postgres_default')
 
 # Initialize duckdb with postgres connector    
-cursor = duckdb.connect('/opt/airflow/data/mls.db')
+# cursor = duckdb.connect('/opt/airflow/data/mls.db')
+cursor = duckdb.connect()
 cursor.sql("INSTALL postgres;")
 cursor.sql("LOAD postgres;")
 cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
