@@ -1,0 +1,48 @@
+2024-04-19 09:14:51.597 CEST [27046] LOG:  starting PostgreSQL 14.11 (Homebrew) on x86_64-apple-darwin23.2.0, compiled by Apple clang version 15.0.0 (clang-1500.1.0.2.5), 64-bit
+2024-04-19 09:14:51.599 CEST [27046] LOG:  listening on IPv6 address "::1", port 5432
+2024-04-19 09:14:51.599 CEST [27046] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2024-04-19 09:14:51.600 CEST [27046] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5432"
+2024-04-19 09:14:51.608 CEST [27047] LOG:  database system was shut down at 2024-04-19 09:14:35 CEST
+2024-04-19 09:14:51.624 CEST [27046] LOG:  database system is ready to accept connections
+2024-04-20 06:24:33.672 CEST [83076] ERROR:  syntax error at or near "USE" at character 1
+2024-04-20 06:24:33.672 CEST [83076] STATEMENT:  USE airflow_db;
+2024-04-20 06:24:55.318 CEST [83076] ERROR:  syntax error at or near "USE" at character 1
+2024-04-20 06:24:55.318 CEST [83076] STATEMENT:  USE airflow_db
+	GRANT ALL ON SCHEMA public to airflow;
+2024-04-20 06:25:10.896 CEST [83076] ERROR:  syntax error at or near "USE" at character 1
+2024-04-20 06:25:10.896 CEST [83076] STATEMENT:  USE airflow_db;
+2024-04-20 06:30:44.697 CEST [83076] ERROR:  syntax error at or near "psql" at character 1
+2024-04-20 06:30:44.697 CEST [83076] STATEMENT:  psql -U pgadmin -d airflow-db
+	CREATE DATABASE test;
+2024-04-20 06:30:58.846 CEST [83076] ERROR:  syntax error at or near "psql" at character 1
+2024-04-20 06:30:58.846 CEST [83076] STATEMENT:  psql -U pgadmin
+	CREATE DATABASE test;
+2024-04-20 06:32:55.633 CEST [85689] FATAL:  role "postgres" does not exist
+2024-04-20 06:42:22.916 CEST [87207] ERROR:  type "nvarchar" does not exist at character 44
+2024-04-20 06:42:22.916 CEST [87207] STATEMENT:  CREATE TABLE keeper_example (
+		keeper_name nvarchar(25) not null,
+		games_played int null,
+		xg float null
+	)
+2024-04-20 07:01:02.212 CEST [92322] ERROR:  relation "keeper_example" does not exist at character 15
+2024-04-20 07:01:02.212 CEST [92322] STATEMENT:  select * from keeper_example
+2024-04-20 07:01:08.870 CEST [92322] ERROR:  relation "public.keeper_example" does not exist at character 15
+2024-04-20 07:01:08.870 CEST [92322] STATEMENT:  select * from public.keeper_example
+2024-04-20 07:05:08.239 CEST [92322] ERROR:  relation "keeper_example" does not exist at character 15
+2024-04-20 07:05:08.239 CEST [92322] STATEMENT:  select * from keeper_example
+2024-04-23 06:20:27.973 CEST [3562] FATAL:  database "postres" does not exist
+2024-04-23 06:20:34.530 CEST [3659] FATAL:  database "postresql" does not exist
+2024-04-23 06:21:19.421 CEST [4371] FATAL:  database "postresql" does not exist
+2024-04-23 06:21:50.473 CEST [4786] FATAL:  database "matthiashugli" does not exist
+2024-04-24 06:21:48.495 CEST [19564] FATAL:  role "pgadmin" does not exist
+2024-04-25 06:41:43.051 CEST [49651] LOG:  invalid length of startup packet
+2024-04-25 06:41:43.062 CEST [49652] LOG:  invalid length of startup packet
+2024-04-25 06:41:43.072 CEST [49653] LOG:  invalid length of startup packet
+2024-04-26 07:45:52.742 CEST [60011] FATAL:  database "airflow" does not exist
+2024-04-26 07:46:29.724 CEST [60382] FATAL:  role "airflow_db" does not exist
+2024-04-26 07:47:25.107 CEST [60971] FATAL:  database "football" does not exist
+2024-04-26 07:47:26.817 CEST [60994] FATAL:  database "football" does not exist
+2024-04-27 08:10:11.462 CEST [27046] LOG:  received smart shutdown request
+2024-04-27 08:10:11.478 CEST [27046] LOG:  background worker "logical replication launcher" (PID 27053) exited with exit code 1
+2024-04-27 08:10:11.479 CEST [27048] LOG:  shutting down
+2024-04-27 08:10:11.527 CEST [27046] LOG:  database system is shut down

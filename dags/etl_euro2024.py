@@ -1,0 +1,167 @@
+import pandas as pd
+import numpy as np
+import duckdb
+import http.client
+from datetime import datetime, timedelta
+import functions.fbref_functions as func
+import tempfile
+import os
+
+from airflow.decorators import dag, task
+from airflow.hooks.base import BaseHook
+
+# ENV_ID = os.environ.get("SYSTEM_TESTS_ENV_ID")
+
+
+default_args = {
+    'owner': 'sa_postgres',
+    'start_date': datetime(2024, 4, 25),
+    'retries': 0
+    # You can add more default arguments here as needed
+}
+
+@dag(
+    dag_id="etl_euro2024",
+    start_date=datetime(2023, 10, 2),
+    schedule="0 5 * * 1",
+    catchup=False,
+    default_args=default_args,
+)
+def ProcessScores():
+    # Define Postgres DB connection
+    postgres_conn = BaseHook.get_connection('postgres_default')
+    
+    # Define drive connection
+    drive_conn = BaseHook.get_connection('kdrive')
+    headers = {
+    'Authorization': 'Bearer ' + drive_conn.password,
+    'Content-Type': 'application/octet-stream',
+    }
+
+    # Initialize duckdb with postgres connector    
+    cursor = duckdb.connect('/opt/airflow/data/euro2024.db')
+    cursor.sql("INSTALL postgres;")
+    cursor.sql("LOAD postgres;")
+    cursor.sql(f"ATTACH 'dbname=airflow user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
+
+    # Define competition url and name    
+    competition_url = 'https://fbref.com/en/comps/676/history/European-Championship-Seasons'
+    comp_name = 'Euro 2024'
+    
+    # 1. task to load data from the URL into a duckdb table
+    @task()
+    def load_fixtures():
+
+        df = func.get_fixtures(competition_url, comp_name)
+
+        custom_file_name = 'euro2024_fixtures.csv'
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
+            df.to_csv(temp.name, index=False)
+
+            with open(temp.name, 'rb') as f:
+                file = f.read()
+            file_size = os.path.getsize(temp.name)
+
+            print('Filename: ' + temp.name)
+            print('Filesize: ' + str(file_size))
+
+            conn = http.client.HTTPSConnection(drive_conn.host)
+            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=4465&file_name={custom_file_name}&conflict=version', file, headers)
+            res = conn.getresponse()
+            data = res.read()
+            print(data.decode("utf-8"))
+
+        return df
+
+    @task()
+    def cleanse_fixtures(load_fixtures):
+        scores_df = func.transform_scores(load_fixtures)
+
+        custom_file_name = 'bundesliga_fixtures_transformed.csv'
+        
+        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
+            scores_df.to_csv(temp.name, index=False)
+
+            with open(temp.name, 'rb') as f:
+                file = f.read()
+            file_size = os.path.getsize(temp.name)
+
+            print('Filename: ' + temp.name)
+            print('Filesize: ' + str(file_size))
+
+            conn = http.client.HTTPSConnection(drive_conn.host)
+            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=4465&file_name={custom_file_name}&conflict=version', file, headers)
+            res = conn.getresponse()
+            data = res.read()
+            print(data.decode("utf-8"))
+
+
+
+        return scores_df
+  
+    @task()
+    def load_shots(cleanse_fixtures):
+        scores = cleanse_fixtures
+        scores = scores[scores['venue'] == 'home']
+        shots = pd.DataFrame()
+        week = np.max(scores['wk'])
+
+        for i in range(len(scores)):    
+            if scores['wk'][i] == week:
+                match_id = scores['match_id'][i]
+                url = scores['url'][i]
+
+                html_df = pd.read_html(url)[-3]
+
+                df = func.clean_shot_table(html_df)
+                df['match_id'] = match_id
+
+                # Remove Added time from the Minute column 45/90 is the max
+                df['Minute'] = [x[0] for x in df['Minute'].astype(str).str.split('+')]
+                df['Minute'] = df['Minute'].astype(float).astype(int)
+
+                        # Remove Penalty note from Player and add to Notes column
+                notes_list = []
+                for i in range(len(df)):
+                    if df.loc[i]['Player'].rsplit("(")[-1] == 'pen)':
+                        notes_list.append('Penalty')
+                    else:
+                        notes_list.append(df.loc[i]['Notes'])
+
+                df['Notes'] = notes_list
+                df['Player'] = [x[0] for x in df['Player'].str.rsplit("(")] # Player
+
+                shots = pd.concat([shots, df]).reset_index().drop(columns=['index'])
+
+        custom_file_name = f'bundesliga_shots_week_{week}.csv'
+
+
+        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
+            shots.to_csv(temp.name, index=False)
+
+            with open(temp.name, 'rb') as f:
+                file = f.read()
+            file_size = os.path.getsize(temp.name)
+
+            print('Filename: ' + temp.name)
+            print('Filesize: ' + str(file_size))
+
+            conn = http.client.HTTPSConnection(drive_conn.host)
+            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=4763&file_name={custom_file_name}&conflict=version', file, headers)
+            res = conn.getresponse()
+            data = res.read()
+            print(data.decode("utf-8"))
+
+    # @task()
+    # def analyze_scores():
+
+    # @task()
+    # def analyze_scoring_opportunities():
+
+
+    get_data = load_fixtures()
+    cls_scores = cleanse_fixtures(get_data)
+    get_shots = load_shots(cls_scores)
+
+ProcessScores()
