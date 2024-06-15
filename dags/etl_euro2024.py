@@ -42,7 +42,7 @@ def ProcessScores():
     cursor = duckdb.connect()
     cursor.sql("INSTALL postgres;")
     cursor.sql("LOAD postgres;")
-    cursor.sql(f"ATTACH 'dbname=airflow user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
+    cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
 
     # Define competition url and name    
     competition_url = 'https://fbref.com/en/comps/676/history/European-Championship-Seasons'
