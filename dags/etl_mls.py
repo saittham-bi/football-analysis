@@ -21,7 +21,7 @@ default_args = {
 }
 
 # Define Postgres DB connection
-postgres_conn = BaseHook.get_connection('postgres_default')
+postgres_conn = BaseHook.get_connection('postgres_integrated')
 
 # Initialize duckdb with postgres connector    
 # cursor = duckdb.connect('/opt/airflow/data/mls.db')
@@ -32,7 +32,7 @@ cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgr
 
 @dag(
     dag_id="etl_mls",
-    start_date=datetime(2023, 10, 2),
+    start_date=datetime(2024, 6, 10),
     schedule="0 5 * * 1",
     catchup=False,
     default_args=default_args,
