@@ -14,7 +14,7 @@ from airflow.hooks.base import BaseHook
 
 
 default_args = {
-    'owner': 'sa_postgres',
+    'owner': '${_AIRFLOW_WWW_USER_USERNAME}',
     'start_date': datetime(2024, 4, 25),
     'retries': 0
     # You can add more default arguments here as needed
@@ -29,7 +29,7 @@ default_args = {
 )
 def ProcessScores():
     # Define Postgres DB connection
-    postgres_conn = BaseHook.get_connection('postgres_default')
+    postgres_conn = BaseHook.get_connection('postgres_integrated')
     
     # Define drive connection
     drive_conn = BaseHook.get_connection('kdrive')
@@ -39,7 +39,7 @@ def ProcessScores():
     }
 
     # Initialize duckdb with postgres connector    
-    cursor = duckdb.connect('/opt/airflow/data/euro2024.db')
+    cursor = duckdb.connect()
     cursor.sql("INSTALL postgres;")
     cursor.sql("LOAD postgres;")
     cursor.sql(f"ATTACH 'dbname=airflow user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
