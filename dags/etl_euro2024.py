@@ -50,7 +50,7 @@ def ProcessScores():
     
     # 1. task to load data from the URL into a duckdb table
     @task()
-    def load_fixtures():
+    def extract_fixtures():
 
         df = func.get_fixtures(competition_url, comp_name)
 
@@ -75,30 +75,18 @@ def ProcessScores():
         return df
 
     @task()
-    def cleanse_fixtures(load_fixtures):
-        scores_df = func.transform_scores(load_fixtures)
-
-        custom_file_name = 'euro2024_transformed.csv'
-        
-        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
-            scores_df.to_csv(temp.name, index=False)
-
-            with open(temp.name, 'rb') as f:
-                file = f.read()
-            file_size = os.path.getsize(temp.name)
-
-            print('Filename: ' + temp.name)
-            print('Filesize: ' + str(file_size))
-
-            conn = http.client.HTTPSConnection(drive_conn.host)
-            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=4465&file_name={custom_file_name}&conflict=version', file, headers)
-            res = conn.getresponse()
-            data = res.read()
-            print(data.decode("utf-8"))
-
-
+    def cleanse_fixtures(extract_fixtures):
+        scores_df = func.transform_scores(extract_fixtures)
 
         return scores_df
+
+    @task()
+    def load_fixtures(cleanse_fixtures):
+        df = cleanse_fixtures
+        cursor.sql("DROP TABLE IF EXISTS postgres_db.euro2024_fixtures;")
+        cursor.sql("CREATE TABLE postgres_db.euro2024_fixtures AS SELECT * FROM df;")
+
+        print(cursor.sql('SELECT * FROM df LIMIT 5;'))
   
     @task()
     def load_shots(cleanse_fixtures):
