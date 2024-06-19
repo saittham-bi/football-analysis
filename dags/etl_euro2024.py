@@ -14,7 +14,7 @@ from airflow.hooks.base import BaseHook
 
 
 default_args = {
-    'owner': '${_AIRFLOW_WWW_USER_USERNAME}',
+    'owner': 'me',
     'start_date': datetime(2024, 4, 25),
     'retries': 0
     # You can add more default arguments here as needed
