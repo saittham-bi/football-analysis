@@ -148,8 +148,9 @@ def ProcessScores():
     # def analyze_scoring_opportunities():
 
 
-    get_data = load_fixtures()
+    get_data = extract_fixtures()
     cls_scores = cleanse_fixtures(get_data)
+    load_scores = load_fixtures(cls_scores)
     get_shots = load_shots(cls_scores)
 
 ProcessScores()
