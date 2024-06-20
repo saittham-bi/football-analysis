@@ -31,7 +31,7 @@ def get_fixtures(url, comp):
 
     fixture_url = season_url.rsplit('/', 1)[0] + '/schedule/'
     fixtures = pd.read_html(fixture_url)[0]
-    fixtures = fixtures.iloc[:, :9]
+    fixtures = fixtures.iloc[:, :-5]
     urls = pd.read_html(fixture_url, extract_links='all')[0].iloc[:, -2].rename('url')
     fixtures = pd.concat([fixtures, urls], axis=1)
     fixtures = fixtures.dropna(subset=['Score']).copy()

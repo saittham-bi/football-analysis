@@ -71,6 +71,8 @@ def ProcessScores():
             res = conn.getresponse()
             data = res.read()
             print(data.decode("utf-8"))
+            print(df.head())
+            print(df.columns)
 
         return df
 
