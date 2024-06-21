@@ -67,7 +67,7 @@ def ProcessScores():
             print('Filesize: ' + str(file_size))
 
             conn = http.client.HTTPSConnection(drive_conn.host)
-            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=4465&file_name={custom_file_name}&conflict=version', file, headers)
+            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=5385&file_name={custom_file_name}&conflict=version', file, headers)
             res = conn.getresponse()
             data = res.read()
             print(data.decode("utf-8"))
