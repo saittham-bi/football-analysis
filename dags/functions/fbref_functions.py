@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 def clean_headers(df):
     df.columns = df.columns.str.replace(' ', '_').str.lower()
@@ -81,6 +82,32 @@ def transform_scores(df):
     scores['wk'] = scores['wk'].astype(int)
 
     return scores
+
+
+def get_match_details(df):
+    df = df[df['venue'] == 'home']
+    last_date = np.max(df['date'])
+    shots = pd.DataFrame()
+    gk_stats = pd.DataFrame()
+    for i in range(len(df)):
+        match_id = df['match_id'][i]
+        
+        if df['date'] == last_date:   
+            url = df['url'][i]
+            html_output = pd.read_html(url)
+
+        shot_output = html_output[-3]
+        shot_output['match_id'] = match_id
+        shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
+
+        gk1_output = html_output[9]
+        gk2_output = html_output[16]
+        gk_all_output = pd.concat([gk1_output, gk2_output]).reset_index().drop(columns=['index'])
+        gk_all_output['match_id'] = match_id
+        gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
+
+    return shots, gk_stats
+
 
 def clean_shot_table(df):
     shots = df.dropna(subset=[df.columns[0]]).reset_index().iloc[:, 1:-2]
