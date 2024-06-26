@@ -63,8 +63,8 @@ def transform_scores(df):
     scores.drop(columns=['score'], inplace=True)
 
     # Rename columns
-    scores = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'home', 'away', 'score_home', 'score_away', 'xg', 'xg.1', 'competition']].copy()
-    scores_away = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'away', 'home', 'score_away', 'score_home', 'xg.1', 'xg', 'competition']].copy()
+    scores = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'home', 'away', 'score_home', 'score_away', 'xg', 'xg.1']].copy()
+    scores_away = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'away', 'home', 'score_away', 'score_home', 'xg.1', 'xg']].copy()
 
     scores.rename(columns={'home': 'team', 'away': 'opponent', 'score_home': 'score', 
                         'score_away': 'score_opp', 'xg.1': 'xg_opp'}, inplace=True)
