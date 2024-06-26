@@ -96,6 +96,7 @@ def get_match_details(df):
     shots = pd.DataFrame()
     gk_stats = pd.DataFrame()
 
+    ### Extraction
     # Loop through last recorded games to extract match_details
     for i in range(len(filtered_df)):
         # Declare variables match_id and url
@@ -129,6 +130,23 @@ def get_match_details(df):
         gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
         gk_all_output['match_id'] = match_id
         gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
+
+    ### Cleaning
+    # Remove Added time from the Minute column 45/90 is the max
+    shots['minute'] = [x[0] for x in shots['minute'].astype(str).str.split('+')]
+    shots['minute'] = shots['minute'].astype(float).astype(int)
+
+    # Remove Penalty note from Player and add to Notes column
+    notes_list = []
+    for i in range(len(shots)):
+        if shots.loc[i]['player'].rsplit("(")[-1] == 'pen)':
+            notes_list.append('Penalty')
+        else:
+            notes_list.append(shots.loc[i]['notes'])
+
+    shots['notes'] = notes_list
+    shots['player'] = [x[0] for x in shots['player'].str.rsplit("(")] # Player
+    shots['squad'] = shots['squad'].map(lambda x: x.split(' ')[1])
 
     return shots, gk_stats
 

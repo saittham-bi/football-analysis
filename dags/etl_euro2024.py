@@ -93,45 +93,35 @@ def ProcessScores():
     @task()
     def get_gk_stats(cleanse_fixtures):
         df = cleanse_fixtures
-        match_details = func.get_match_details(df)
+        match_details = func.get_match_details(df)[1]
 
-        print(match_details)
+        cursor.sql("CREATE TABLE postgres_db.euro2024_goalkeeper_stats AS SELECT * FROM match_details;")
+
+        print(cursor.sql('SELECT * FROM match_details LIMIT 5;'))
   
     @task()
     def load_shots(cleanse_fixtures):
-        scores = cleanse_fixtures
-        scores = scores[scores['venue'] == 'home']
-        shots = pd.DataFrame()
-        week = np.max(scores['wk'])
+        df = cleanse_fixtures
+        shots = func.get_match_details(df)[0]
 
-        for i in range(len(scores)):    
-            if scores['wk'][i] == week:
-                match_id = scores['match_id'][i]
-                url = scores['url'][i]
+        # Remove Added time from the Minute column 45/90 is the max
+        shots['minute'] = [x[0] for x in shots['minute'].astype(str).str.split('+')]
+        shots['minute'] = shots['minute'].astype(float).astype(int)
 
-                html_df = pd.read_html(url)[-3]
+                # Remove Penalty note from Player and add to Notes column
+        notes_list = []
+        for i in range(len(df)):
+            if df.loc[i]['Player'].rsplit("(")[-1] == 'pen)':
+                notes_list.append('Penalty')
+            else:
+                notes_list.append(df.loc[i]['Notes'])
 
-                df = func.clean_shot_table(html_df)
-                df['match_id'] = match_id
+        df['Notes'] = notes_list
+        df['Player'] = [x[0] for x in df['Player'].str.rsplit("(")] # Player
 
-                # Remove Added time from the Minute column 45/90 is the max
-                df['Minute'] = [x[0] for x in df['Minute'].astype(str).str.split('+')]
-                df['Minute'] = df['Minute'].astype(float).astype(int)
+        shots = pd.concat([shots, df]).reset_index().drop(columns=['index'])
 
-                        # Remove Penalty note from Player and add to Notes column
-                notes_list = []
-                for i in range(len(df)):
-                    if df.loc[i]['Player'].rsplit("(")[-1] == 'pen)':
-                        notes_list.append('Penalty')
-                    else:
-                        notes_list.append(df.loc[i]['Notes'])
-
-                df['Notes'] = notes_list
-                df['Player'] = [x[0] for x in df['Player'].str.rsplit("(")] # Player
-
-                shots = pd.concat([shots, df]).reset_index().drop(columns=['index'])
-
-        custom_file_name = f'euro2024_shots_week_{week}.csv'
+    custom_file_name = f'euro2024_shots_week_{week}.csv'
 
 
         with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
