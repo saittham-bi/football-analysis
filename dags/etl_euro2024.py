@@ -99,7 +99,7 @@ def ProcessScores():
         return match_details
 
     @task()
-    def get_gk_stats(get_match_details):
+    def load_gk_stats(get_match_details):
         gk_stats = get_match_details[1]
 
         cursor.sql("CREATE TABLE postgres_db.goalkeeper_stats AS SELECT * FROM gk_stats;")
@@ -116,9 +116,10 @@ def ProcessScores():
 
 
     get_data = extract_fixtures()
-    cls_scores = cleanse_fixtures(get_data)
-    load_scores = load_fixtures(cls_scores)
-    load_matchdetails = get_gk_stats(cls_scores)
-    get_shots = load_shots(cls_scores)
+    clean_scores = cleanse_fixtures(get_data)
+    clean_matchdetails = get_match_details(clean_scores)
+    insert_scores = load_fixtures(clean_scores)
+    insert_gk_stats = load_gk_stats(clean_matchdetails)
+    insert_shots = load_shots(clean_matchdetails)
 
 ProcessScores()
