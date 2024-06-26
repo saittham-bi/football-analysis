@@ -63,8 +63,8 @@ def transform_scores(df):
     scores.drop(columns=['score'], inplace=True)
 
     # Rename columns
-    scores = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'home', 'away', 'score_home', 'score_away', 'xg', 'xg.1']].copy()
-    scores_away = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'away', 'home', 'score_away', 'score_home', 'xg.1', 'xg']].copy()
+    scores = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'home', 'away', 'score_home', 'score_away', 'xg', 'xg.1', 'competition']].copy()
+    scores_away = scores[['url', 'competition', 'wk', 'day', 'date', 'time',  'away', 'home', 'score_away', 'score_home', 'xg.1', 'xg', 'competition']].copy()
 
     scores.rename(columns={'home': 'team', 'away': 'opponent', 'score_home': 'score', 
                         'score_away': 'score_opp', 'xg.1': 'xg_opp'}, inplace=True)
@@ -101,6 +101,7 @@ def get_match_details(df):
     for i in range(len(filtered_df)):
         # Declare variables match_id and url
         match_id = filtered_df['match_id'][i]
+        competition = filtered_df['competition']
         url = df['url'][i]
 
         # Read html output from match url
@@ -113,6 +114,7 @@ def get_match_details(df):
         shot_output = html_output[-3]
         shot_output = shot_output.set_axis(shot_columns, axis=1)
         shot_output['match_id'] = match_id
+        shot_output['competition'] = competition
         shot_output = shot_output.dropna(subset=['minute'])
         shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
@@ -130,6 +132,7 @@ def get_match_details(df):
         gk_all_output = pd.concat([gk1_output, gk2_output])
         gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
         gk_all_output['match_id'] = match_id
+        gk_all_output['competition'] = competition
         gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
 
     ### Cleaning

@@ -14,7 +14,7 @@ from airflow.hooks.base import BaseHook
 
 
 default_args = {
-    'owner': 'me',
+    'owner': 'MH',
     'start_date': datetime(2024, 4, 25),
     'retries': 0
     # You can add more default arguments here as needed
@@ -85,26 +85,32 @@ def ProcessScores():
     @task()
     def load_fixtures(cleanse_fixtures):
         df = cleanse_fixtures
-        cursor.sql("DROP TABLE IF EXISTS postgres_db.euro2024_fixtures;")
-        cursor.sql("CREATE TABLE postgres_db.euro2024_fixtures AS SELECT * FROM df;")
+        cursor.sql("DROP TABLE IF EXISTS postgres_db.fixtures;")
+        cursor.sql("CREATE TABLE postgres_db.fixtures AS SELECT * FROM df;")
 
         print(cursor.sql('SELECT * FROM df LIMIT 5;'))
 
+
     @task()
-    def get_gk_stats(cleanse_fixtures):
+    def get_match_details(cleanse_fixtures):
         df = cleanse_fixtures
-        match_details = func.get_match_details(df)[1]
+        match_details = func.get_match_details(df)
 
-        cursor.sql("CREATE TABLE postgres_db.euro2024_goalkeeper_stats AS SELECT * FROM match_details;")
+        return match_details
 
-        print(cursor.sql('SELECT * FROM match_details LIMIT 5;'))
+    @task()
+    def get_gk_stats(get_match_details):
+        gk_stats = get_match_details[1]
+
+        cursor.sql("CREATE TABLE postgres_db.goalkeeper_stats AS SELECT * FROM gk_stats;")
+
+        print(cursor.sql('SELECT * FROM gk_stats LIMIT 5;'))
   
     @task()
-    def load_shots(cleanse_fixtures):
-        df = cleanse_fixtures
-        shots = func.get_match_details(df)[0]
+    def load_shots(get_match_details):
+        shots = get_match_details[0]
 
-        cursor.sql("CREATE TABLE postgres_db.euro2024_shots AS SELECT * FROM shots;")
+        cursor.sql("CREATE TABLE postgres_db.shots AS SELECT * FROM shots;")
 
         print(cursor.sql('SELECT * FROM shots LIMIT 5;'))
 
