@@ -149,16 +149,3 @@ def get_match_details(df):
     shots['squad'] = shots['squad'].map(lambda x: x.split(' ')[1])
 
     return shots, gk_stats
-
-
-def clean_shot_table(df):
-    shots = df.dropna(subset=[df.columns[0]]).reset_index().iloc[:, 1:-2]
-
-    headers = [i[1] for i in shots.columns]
-
-    # Clean Header names
-    shots.columns = headers
-    shots.columns.values[-1] = 'Assist ' + shots.columns[-1]
-    shots.columns.values[-2] = 'Assist ' + shots.columns[-2]
-    
-    return shots

@@ -104,47 +104,9 @@ def ProcessScores():
         df = cleanse_fixtures
         shots = func.get_match_details(df)[0]
 
-        # Remove Added time from the Minute column 45/90 is the max
-        shots['minute'] = [x[0] for x in shots['minute'].astype(str).str.split('+')]
-        shots['minute'] = shots['minute'].astype(float).astype(int)
+        cursor.sql("CREATE TABLE postgres_db.euro2024_shots AS SELECT * FROM shots;")
 
-                # Remove Penalty note from Player and add to Notes column
-        notes_list = []
-        for i in range(len(df)):
-            if df.loc[i]['Player'].rsplit("(")[-1] == 'pen)':
-                notes_list.append('Penalty')
-            else:
-                notes_list.append(df.loc[i]['Notes'])
-
-        df['Notes'] = notes_list
-        df['Player'] = [x[0] for x in df['Player'].str.rsplit("(")] # Player
-
-        shots = pd.concat([shots, df]).reset_index().drop(columns=['index'])
-
-    custom_file_name = f'euro2024_shots_week_{week}.csv'
-
-
-        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
-            shots.to_csv(temp.name, index=False)
-
-            with open(temp.name, 'rb') as f:
-                file = f.read()
-            file_size = os.path.getsize(temp.name)
-
-            print('Filename: ' + temp.name)
-            print('Filesize: ' + str(file_size))
-
-            conn = http.client.HTTPSConnection(drive_conn.host)
-            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=5385&file_name={custom_file_name}&conflict=version', file, headers)
-            res = conn.getresponse()
-            data = res.read()
-            print(data.decode("utf-8"))
-
-    # @task()
-    # def analyze_scores():
-
-    # @task()
-    # def analyze_scoring_opportunities():
+        print(cursor.sql('SELECT * FROM shots LIMIT 5;'))
 
 
     get_data = extract_fixtures()
