@@ -85,24 +85,48 @@ def transform_scores(df):
 
 
 def get_match_details(df):
+    # Select only home games to reduce to single games
     df = df[df['venue'] == 'home']
+
+    # Define the last current date and filter dataframe
     last_date = np.max(df['date'])
+    filtered_df = df[df['date'] == last_date].reset_index().drop(columns='index')
+    
+    # Initiate empty Dataframes
     shots = pd.DataFrame()
     gk_stats = pd.DataFrame()
-    for i in range(len(df)):
-        match_id = df['match_id'][i]
-        
-        if df['date'] == last_date:   
-            url = df['url'][i]
-            html_output = pd.read_html(url)
 
+    # Loop through last recorded games to extract match_details
+    for i in range(len(filtered_df)):
+        # Declare variables match_id and url
+        match_id = filtered_df['match_id'][i]
+        url = df['url'][i]
+
+        # Read html output from match url
+        html_output = pd.read_html(url)
+
+        # Extract shot statistics from match_detail
+        shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 
+                        'outcome', 'distance', 'bodypart', 'notes', 
+                        'assist_player1', 'assist1', 'assist_player2', 'assist2']
         shot_output = html_output[-3]
+        shot_output = shot_output.set_axis(shot_columns, axis=1)
         shot_output['match_id'] = match_id
         shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
-        gk1_output = html_output[9]
-        gk2_output = html_output[16]
-        gk_all_output = pd.concat([gk1_output, gk2_output]).reset_index().drop(columns=['index'])
+        # Extract goalkeeper statistics from both goalkeeper
+        gk_columns = ['player', 'age', 'min', 'shots', 'goals',
+        'saves', 'save_perc', 'psxg', 'launch_completion', 
+        'launch_attempts', 'launch_comp_percentage', 
+        'pass_attempt', 'throws', 'launch_percentage', 
+        'pass_average_length', 'goalkicks', 'goalkicks_launched_percentage',
+        'goalkicks_average_length', 'crosses', 'crosses_stopped', 
+        'crosses_stopped_percentage', 'actions_outside_penaltyarea', 'actions_average_distance']
+        # Neglect nation column from goalkeeper if existent
+        gk1_output = html_output[9].drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+        gk2_output = html_output[16].drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+        gk_all_output = pd.concat([gk1_output, gk2_output])
+        gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
         gk_all_output['match_id'] = match_id
         gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
 

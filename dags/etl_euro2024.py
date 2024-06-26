@@ -160,7 +160,7 @@ def ProcessScores():
     get_data = extract_fixtures()
     cls_scores = cleanse_fixtures(get_data)
     load_scores = load_fixtures(cls_scores)
-    load_matchdetails = get_gk_stats(load_scores)
+    load_matchdetails = get_gk_stats(cls_scores)
     get_shots = load_shots(cls_scores)
 
 ProcessScores()
