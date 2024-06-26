@@ -113,6 +113,7 @@ def get_match_details(df):
         shot_output = html_output[-3]
         shot_output = shot_output.set_axis(shot_columns, axis=1)
         shot_output['match_id'] = match_id
+        shot_output = shot_output.dropna(subset=['minute'])
         shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
         # Extract goalkeeper statistics from both goalkeeper
