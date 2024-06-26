@@ -114,7 +114,6 @@ def get_match_details(df):
         shot_output = html_output[-3]
         shot_output = shot_output.set_axis(shot_columns, axis=1)
         shot_output['match_id'] = match_id
-        shot_output['competition'] = competition
         shot_output = shot_output.dropna(subset=['minute'])
         shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
@@ -132,7 +131,6 @@ def get_match_details(df):
         gk_all_output = pd.concat([gk1_output, gk2_output])
         gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
         gk_all_output['match_id'] = match_id
-        gk_all_output['competition'] = competition
         gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
 
     ### Cleaning
@@ -151,5 +149,9 @@ def get_match_details(df):
     shots['notes'] = notes_list
     shots['player'] = [x[0] for x in shots['player'].str.rsplit("(")] # Player
     shots['squad'] = shots['squad'].map(lambda x: x.split(' ')[1])
+    shots['competition'] = competition
+
+    # Add competition to goalkeeper stats
+    gk_stats['competition'] = competition
 
     return shots, gk_stats
