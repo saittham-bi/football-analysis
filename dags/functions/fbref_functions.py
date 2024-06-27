@@ -50,7 +50,7 @@ class fbrefStats:
         fixtures['season'] = season
 
         # Extract URL to matches
-        fixtures['url'] = [self.create_url(x[1]) for x in df['url']]
+        fixtures['url'] = [self.create_url(x[1]) for x in fixtures['url']]
         
         return fixtures
 
