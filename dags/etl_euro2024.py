@@ -46,13 +46,13 @@ def ProcessScores():
 
     # Define competition url and name    
     competition_url = 'https://fbref.com/en/comps/676/history/European-Championship-Seasons'
-    comp_name = 'Euro 2024'
+    fb_stats = func.fbrefStats(competition_url)
     
     # 1. task to load data from the URL into a duckdb table
     @task()
     def extract_fixtures():
 
-        df = func.get_fixtures(competition_url, comp_name)
+        df = fb_stats.get_fixtures()
 
         custom_file_name = 'euro2024_fixtures.csv'
         
@@ -72,13 +72,12 @@ def ProcessScores():
             data = res.read()
             print(data.decode("utf-8"))
             print(df.head())
-            print(df.columns)
 
         return df
 
     @task()
     def cleanse_fixtures(extract_fixtures):
-        scores_df = func.transform_scores(extract_fixtures)
+        scores_df = fb_stats.transform_scores(extract_fixtures)
 
         return scores_df
 
@@ -94,7 +93,7 @@ def ProcessScores():
     @task()
     def get_match_details(cleanse_fixtures):
         df = cleanse_fixtures
-        match_details = func.get_match_details(df)
+        match_details = fb_stats.get_match_details(df)
 
         return match_details
 
