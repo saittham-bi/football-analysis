@@ -101,7 +101,7 @@ def ProcessScores():
     def load_gk_stats(get_match_details):
         gk_stats = get_match_details[1]
 
-        cursor.sql("CREATE TABLE postgres_db.goalkeeper_stats AS SELECT * FROM gk_stats;")
+        cursor.sql("INSERT INTO postgres_db.goalkeeper_stats SELECT * FROM gk_stats;")
 
         print(cursor.sql('SELECT * FROM gk_stats LIMIT 5;'))
   
@@ -109,7 +109,7 @@ def ProcessScores():
     def load_shots(get_match_details):
         shots = get_match_details[0]
 
-        cursor.sql("CREATE TABLE postgres_db.shots AS SELECT * FROM shots;")
+        cursor.sql("INSERT INTO postgres_db.shots SELECT * FROM shots;")
 
         print(cursor.sql('SELECT * FROM shots LIMIT 5;'))
 
