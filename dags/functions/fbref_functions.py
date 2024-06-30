@@ -85,7 +85,7 @@ class fbrefStats:
         scores = pd.concat([scores, scores_away]).reset_index()
 
         scores['date'] = pd.to_datetime(scores['date'])
-        scores['wk'] = scores['wk'].astype(int)
+        df['wk'].replace({np.nan: 0}).astype(int)
 
         return scores
 
