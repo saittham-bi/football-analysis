@@ -75,8 +75,8 @@ class fbrefStats:
 
     def get_teams(self, df):
         # Create a dataframe with team_id and team name
-        home = df[['home_id', 'home',]].rename(columns={'home': 'team_name', 'home_id': 'team_id'})
-        away = df[['away_id', 'away']].rename(columns={'away': 'team_name', 'away_id': 'team_id'})
+        home = df[['home_id', 'home', 'inserted_timestamp']].rename(columns={'home': 'team_name', 'home_id': 'team_id'})
+        away = df[['away_id', 'away', 'inserted_timestamp']].rename(columns={'away': 'team_name', 'away_id': 'team_id'})
 
         teams = pd.concat([home, away], axis=0)
 

@@ -10,9 +10,6 @@ import os
 from airflow.decorators import dag, task
 from airflow.hooks.base import BaseHook
 
-# ENV_ID = os.environ.get("SYSTEM_TESTS_ENV_ID")
-
-
 default_args = {
     'owner': 'MH',
     'start_date': datetime(2024, 4, 25),
@@ -23,7 +20,7 @@ default_args = {
 @dag(
     dag_id="etl_euro2024",
     start_date=datetime(2023, 10, 2),
-    schedule="0 5 * * 1",
+    # schedule="0 5 * * 1",
     catchup=False,
     default_args=default_args,
 )
@@ -41,6 +38,7 @@ def ProcessScores():
     # Initialize duckdb with postgres connector    
     cursor = duckdb.connect()
     cursor.sql("INSTALL postgres;")
+    cursor.sql("INSTALL parquet;")
     cursor.sql("LOAD postgres;")
     cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
 
@@ -78,19 +76,21 @@ def ProcessScores():
     def load_teams(extract_fixtures):
         df = extract_fixtures
         teams = fb_stats.get_teams(df)
-
         table_name = 'postgres_db.teams'
-        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM teams;")        
+
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM teams;")
+        teams_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});")
+        print(cursor.sql(f'SELECT count(*) FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});'))   
 
     @task()
     def load_fixtures(extract_fixtures):
         df = extract_fixtures
         table_name = 'postgres_db.fixtures'
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df;")
-        new_matches = cursor.sql(f"SELECT * FROM {table_name} WHERE inserted_timestamp = (SELECT max(inserted_timestamp) FROM {table_name});").df()
-        print(cursor.sql('SELECT count(*) FROM new_matches;'))
+        matches_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
+        print(cursor.sql(f'SELECT count(*) FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});'))
         
-        return df
+        return matches_updates
     
     @task()
     def cleanse_scores(load_fixtures):
@@ -99,6 +99,7 @@ def ProcessScores():
         table_name = 'postgres_db.scores'
         # cursor.sql("DROP TABLE IF EXISTS postgres_db.fixtures;")
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM scores_df;")
+        # cursor.sql(f"COPY {table_name} FROM scores_df;")
 
         return scores_df
 
@@ -117,6 +118,7 @@ def ProcessScores():
         table_name = 'postgres_db.goalkeeper_stats'
         #cursor.sql(f"SELECT * FROM {table_name} UNION SELECT * FROM gk_stats;")
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM gk_stats;")
+        # cursor.sql(f"COPY {table_name} FROM gk_stats;")
 
         print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
   
@@ -127,6 +129,7 @@ def ProcessScores():
         table_name = 'postgres_db.shots'
         #cursor.sql(f"SELECT * FROM {table_name} UNION SELECT * FROM shots;")
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM shots;")
+        # cursor.sql(f"COPY {table_name} FROM shots;")
 
         print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
 
