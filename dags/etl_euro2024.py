@@ -90,8 +90,8 @@ def ProcessScores():
         matches_insert = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
         print(cursor.sql(f'SELECT count(*) FROM matches_updates;'))
         
-        return df.loc[:5]
-        # server immer noch 0:5, lokal schon 10:15 geladen
+        return df.loc[5:10]
+        # server immer noch 5:10, lokal schon 10:15 geladen
         # anschliessend wieder wechseln auf
         # return matches_updates
     
