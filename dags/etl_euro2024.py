@@ -79,7 +79,7 @@ def ProcessScores():
         table_name = 'postgres_db.teams'
 
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM teams;")
-        teams_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});")
+        #teams_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});")
         print(cursor.sql(f'SELECT count(*) FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});'))   
 
     @task()
@@ -87,10 +87,10 @@ def ProcessScores():
         df = extract_fixtures
         table_name = 'postgres_db.fixtures'
         cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df;")
-        matches_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
+        #matches_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
         print(cursor.sql(f'SELECT count(*) FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});'))
         
-        return matches_updates
+        return df
     
     @task()
     def cleanse_scores(load_fixtures):
