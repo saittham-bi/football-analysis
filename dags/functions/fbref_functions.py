@@ -36,11 +36,28 @@ class fbrefStats:
         competition = competition_dict['competition']
 
         fixture_url = season_url.rsplit('/', 1)[0] + '/schedule/'
-        fixtures = pd.read_html(fixture_url)[0]
-        fixtures = fixtures.iloc[:, :-5]
-        urls = pd.read_html(fixture_url, extract_links='all')[0].iloc[:, -2].rename('url')
-        fixtures = pd.concat([fixtures, urls], axis=1)
-        fixtures = fixtures.dropna(subset=['Score']).copy()
+        fixtures = pd.read_html(fixture_url, extract_links='body')[0]
+
+        # Explode the dataframe with URL
+        # URL value will be added as new row
+        # Remove duplicated row on index for fixture dataframe
+        fixtures_exp = fixtures.explode(list(fixtures.columns))
+        fixtures_exp['Score'] = fixtures_exp['Score'].replace('', np.nan)
+        fixtures_exp.dropna(subset=['Score'], inplace=True)
+        fixtures = fixtures_exp.groupby(fixtures_exp.index).first()
+
+        # Use duplicated row to define team id of home and away
+        # And define the url and the match id
+        id_columns = fixtures_exp.groupby(fixtures_exp.index).last()
+        id_columns = id_columns.dropna(subset=['Score'])
+        id_columns['url'] = [self.create_url(x) for x in id_columns['Match Report']]
+        id_columns['match_id'] = [x[0].split('/en/matches/')[1] for x in id_columns['Match Report'].str.rsplit('/', n=1)]
+        id_columns['home_id'] = [x[0].split('/en/squads/')[1] for x in id_columns['Home'].str.rsplit('/', n=1)]
+        id_columns['away_id'] = [x[0].split('/en/squads/')[1] for x in id_columns['Away'].str.rsplit('/', n=1)]
+        id_columns = id_columns.iloc[:, -4:]
+
+        # Add the id columns to the fixture dataframe
+        fixtures = pd.concat([fixtures, id_columns], axis=1).reset_index().drop(columns='index')
 
         # Rename column headers
         fixtures = self.clean_headers(fixtures)
@@ -48,44 +65,56 @@ class fbrefStats:
         # Add column
         fixtures['competition'] = competition
         fixtures['season'] = season
+        fixtures['inserted_timestamp'] = pd.to_datetime('today')
 
-        # Extract URL to matches
-        fixtures['url'] = [self.create_url(x[1]) for x in fixtures['url']]
+        # Column [Round] is not present for every competition. Fill the column with a default value if non is existent
+        if 'round' not in fixtures.columns:
+            fixtures['round'] = 'Regular Season'
         
         return fixtures
+
+    def get_teams(self, df):
+        # Create a dataframe with team_id and team name
+        home = df[['home_id', 'home',]].rename(columns={'home': 'team_name', 'home_id': 'team_id'})
+        away = df[['away_id', 'away']].rename(columns={'away': 'team_name', 'away_id': 'team_id'})
+
+        teams = pd.concat([home, away], axis=0)
+
+        return teams
 
     def transform_scores(self, df):
         scores = df.dropna(subset=['score']).copy()
 
-        # Get Match ID
-        scores.loc[:,'match_id'] = [x[0].split('https://fbref.com/en/matches/')[1] for x in scores['url'].str.rsplit('/', n=1)]
-        scores.set_index('match_id', inplace=True)
-
         # Split the score
-        scores['score_home'] = [x[0] for x in scores['score'].str.split('–')]
-        scores['score_away'] = [x[1] for x in scores['score'].str.split('–')]
+        scores['score_home'] = [sum([int(y) for y in x[0].replace(")","").replace("(","").split(" ")]) for x in scores['score'].str.split('–')]
+        scores['score_away'] = [sum([int(y) for y in x[1].replace(")","").replace("(","").split(" ")]) for x in scores['score'].str.split('–')]
         scores['score_home'] = scores['score_home'].astype(int)
         scores['score_away'] = scores['score_away'].astype(int)
-        scores.drop(columns=['score'], inplace=True)
+        scores = scores.drop(columns=['score']).copy()
+
+        # Label matches which had a Penalty Shootout
+        scores['notes'] = np.where(scores['notes'].str.contains('penalty', regex=False) == True, 'Penalty Shootout', scores['notes'])
 
         # Rename columns
-        scores = scores[['url', 'competition', 'season', 'wk', 'day', 'date', 'time',  'home', 'away', 'score_home', 'score_away', 'xg', 'xg.1']].copy()
-        scores_away = scores[['url', 'competition', 'season', 'wk', 'day', 'date', 'time',  'away', 'home', 'score_away', 'score_home', 'xg.1', 'xg']].copy()
+        scores_home = scores[['url', 'match_id', 'competition', 'season', 'wk', 'day', 'date', 'time',
+                          'home_id', 'away', 'score_home', 'score_away', 'xg', 'xg.1', 'inserted_timestamp']].copy()
+        scores_away = scores[['url', 'match_id', 'competition', 'season', 'wk', 'day', 'date', 'time', 
+                              'away_id', 'home', 'score_away', 'score_home', 'xg.1', 'xg', 'inserted_timestamp']].copy()
 
-        scores.rename(columns={'home': 'team', 'away': 'opponent', 'score_home': 'score', 
+        scores_home.rename(columns={'home_id': 'team_id', 'away': 'opponent', 'score_home': 'score', 
                             'score_away': 'score_opp', 'xg.1': 'xg_opp'}, inplace=True)
 
         scores_away.rename(columns={'home': 'opponent', 'away': 'team', 'score_home': 'score_opp', 
                                     'score_away': 'score', 'xg.1': 'xg', 'xg': 'xg_opp'}, inplace=True)
 
         # Add home venue for all games in df
-        scores['venue'] = 'home'
+        scores_home['venue'] = 'home'
         scores_away['venue'] = 'away'
 
-        scores = pd.concat([scores, scores_away]).reset_index()
+        scores = pd.concat([scores_home, scores_away]).reset_index()
 
         scores['date'] = pd.to_datetime(scores['date'])
-        df['wk'].replace({np.nan: 0}).astype(int)
+        # scores['wk'] = scores['wk'].replace({np.nan: 0}).astype(int)
 
         return scores
 
@@ -95,52 +124,80 @@ class fbrefStats:
         season = competition_dict['season']
         competition = competition_dict['competition']
         
-        # Select only home games to reduce to single games
-        df = df[df['venue'] == 'home']
-
-        # Define the last current date and filter dataframe
-        last_date = np.max(df['date'])
-        filtered_df = df[df['date'] == last_date].reset_index().drop(columns='index')
-        
         # Initiate empty Dataframes
         shots = pd.DataFrame()
         gk_stats = pd.DataFrame()
 
         ### Extraction
         # Loop through last recorded games to extract match_details
-        for i in range(len(filtered_df)):
+        for i in range(len(df)):
             # Declare variables match_id and url
-            match_id = filtered_df['match_id'][i]
-            url = filtered_df['url'][i]
+            match_id = df['match_id'][i]
+            url = df['url'][i]
+            home_team = df['home_id'][i]
 
             # Read html output from match url
-            html_output = pd.read_html(url)
+            html_output = pd.read_html(url, extract_links='body')
 
-            # Extract shot statistics from match_detail
-            shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 
-                            'outcome', 'distance', 'bodypart', 'notes', 
-                            'assist_player1', 'assist1', 'assist_player2', 'assist2']
-            shot_output = html_output[-3]
-            shot_output = shot_output.set_axis(shot_columns, axis=1)
-            shot_output['match_id'] = match_id
-            shot_output = shot_output.dropna(subset=['minute'])
-            shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
-            # Extract goalkeeper statistics from both goalkeeper
-            gk_columns = ['player', 'age', 'min', 'shots', 'goals',
+            ### Extract goalkeeper statistics from both goalkeeper
+            gk_columns = ['player', 'nation', 'age', 'min', 'shots', 'goals',
             'saves', 'save_perc', 'psxg', 'launch_completion', 
             'launch_attempts', 'launch_comp_percentage', 
             'pass_attempt', 'throws', 'launch_percentage', 
             'pass_average_length', 'goalkicks', 'goalkicks_launched_percentage',
             'goalkicks_average_length', 'crosses', 'crosses_stopped', 
             'crosses_stopped_percentage', 'actions_outside_penaltyarea', 'actions_average_distance']
-            # Neglect nation column from goalkeeper if existent
-            gk1_output = html_output[9].drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
-            gk2_output = html_output[16].drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+            
+            # Create home goalkeeper dataframe
+            gk1_exp = html_output[9].explode(list(html_output[9].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+            gk1_output = gk1_exp.groupby(gk1_exp.index).first()
+            # Column [Nation] is not present for every competition. Fill the column with None if non is existent
+            if 'Nation' not in gk1_output.columns:
+                gk1_output['Nation'] = np.nan
+            
+            # Create away goalkeeper dataframe
+            gk2_exp = html_output[16].explode(list(html_output[16].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+            gk2_output = gk2_exp.groupby(gk2_exp.index).first()
+            # Column [Nation] is not present for every competition. Fill the column with None if non is existent
+            if 'Nation' not in gk2_output.columns:
+                gk2_output['Nation'] = np.nan
+
+            # Combine home and away GK dataframes
             gk_all_output = pd.concat([gk1_output, gk2_output])
             gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
+            
+            # Add match_id and append to overall dataframe
             gk_all_output['match_id'] = match_id
             gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
+            
+            # Define home and away goalkeeper name for shots
+            home_goalkeeper = gk1_output.iloc[0, 0]
+            away_goalkeeper = gk2_output.iloc[0, 0]
+
+            ### Extract shot statistics from match_detail
+            shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 
+                            'outcome', 'distance', 'bodypart', 'notes', 
+                            'assist_player1', 'assist1', 'assist_player2', 'assist2']
+            shot_exp = html_output[-3].explode(list(html_output[-3].columns))
+            shot_exp[shot_exp.columns[1]] = shot_exp[shot_exp.columns[1]].replace('', np.nan)
+            shot_exp[shot_exp.columns[-2]] = shot_exp[shot_exp.columns[-2]].replace('', np.nan)
+            shot_exp[shot_exp.columns[-4]] = shot_exp[shot_exp.columns[-4]].replace('', np.nan)
+            shot_exp.dropna(subset=[shot_exp.columns[1]], inplace=True)
+            shot_output = shot_exp.groupby(shot_exp.index).first()
+            shot_output = shot_output.set_axis(shot_columns, axis=1)
+            shot_output = shot_output.dropna(subset=['minute'])
+
+            # Extract the team id
+            shot_ids = shot_exp.groupby(shot_exp.index).last()
+            shot_output['team_id'] = [x[0].split('/en/squads/')[1] for x in shot_ids.iloc[:, 2].str.rsplit('/', n=1)]
+
+            # Add match_id and goalkeeper  column
+            shot_output['match_id'] = match_id
+            shot_output['goalkeeper'] = np.where(shot_output['team_id'] == home_team, away_goalkeeper, home_goalkeeper)
+
+            # Add transformed rows to shot dataframe
+            shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
         ### Cleaning
         # Remove Added time from the Minute column 45/90 is the max
