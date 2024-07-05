@@ -72,11 +72,11 @@ def ProcessScores():
             data = res.read()
             print(data.decode("utf-8"))
 
-        return df
+        return df.loc[:5]
     
     @task()
     def load_teams(extract_fixtures):
-        df = extract_fixtures.loc[:8]
+        df = extract_fixtures
         teams = fb_stats.get_teams(df)
 
         table_name = 'postgres_db.teams'
