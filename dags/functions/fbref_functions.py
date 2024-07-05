@@ -104,7 +104,7 @@ class fbrefStats:
         scores_home.rename(columns={'home_id': 'team_id', 'away': 'opponent', 'score_home': 'score', 
                             'score_away': 'score_opp', 'xg.1': 'xg_opp'}, inplace=True)
 
-        scores_away.rename(columns={'home': 'opponent', 'away': 'team', 'score_home': 'score_opp', 
+        scores_away.rename(columns={'away_id': 'team_id', 'home': 'opponent', 'away': 'team', 'score_home': 'score_opp', 
                                     'score_away': 'score', 'xg.1': 'xg', 'xg': 'xg_opp'}, inplace=True)
 
         # Add home venue for all games in df
