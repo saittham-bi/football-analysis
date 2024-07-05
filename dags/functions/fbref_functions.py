@@ -186,7 +186,7 @@ class fbrefStats:
             shot_exp.dropna(subset=[shot_exp.columns[1]], inplace=True)
             shot_output = shot_exp.groupby(shot_exp.index).first()
             shot_output = shot_output.set_axis(shot_columns, axis=1)
-            shot_output = shot_output.dropna(subset=['minute'])
+            shot_output.dropna(subset=['minute'], inplace=True)
 
             # Extract the team id
             shot_ids = shot_exp.groupby(shot_exp.index).last()
