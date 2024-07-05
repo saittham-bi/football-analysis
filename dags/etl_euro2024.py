@@ -38,7 +38,6 @@ def ProcessScores():
     # Initialize duckdb with postgres connector    
     cursor = duckdb.connect()
     cursor.sql("INSTALL postgres;")
-    cursor.sql("INSTALL parquet;")
     cursor.sql("LOAD postgres;")
     cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
 

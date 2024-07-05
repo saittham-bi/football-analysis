@@ -45,16 +45,15 @@ def ProcessScores():
     'Content-Type': 'application/octet-stream',
     }
 
-
     # Define competition url and name    
     competition_url = 'https://fbref.com/en/comps/22/history/Major-League-Soccer-Seasons'
-    comp_name = 'Major League Soccer'
-    
+    fb_stats = func.fbrefStats(competition_url)
+
     # 1. task to load data from the URL into a duckdb table
     @task()
     def extract_fixtures():
 
-        df = func.get_fixtures(competition_url, comp_name)
+        df = fb_stats.get_fixtures()
 
         custom_file_name = 'mls_fixtures.csv'
         
@@ -75,50 +74,78 @@ def ProcessScores():
             print(data.decode("utf-8"))
 
         return df
+    
+    @task()
+    def load_teams(extract_fixtures):
+        df = extract_fixtures
+        teams = fb_stats.get_teams(df)
+        table_name = 'postgres_db.teams'
+
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM teams;")
+        teams_updates = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});")
+        print(cursor.sql(f'SELECT count(*) FROM teams WHERE team_id NOT IN (SELECT team_id FROM {table_name});'))   
 
     @task()
-    def cleanse_fixtures(extract_fixtures):
-        scores_df = func.transform_scores(extract_fixtures)
+    def load_fixtures(extract_fixtures):
+        df = extract_fixtures
+        table_name = 'postgres_db.fixtures'
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM df;")
+        matches_updates = cursor.sql(f"SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});").df()
+        matches_insert = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
+        print(cursor.sql(f'SELECT count(*) FROM matches_updates;'))
+        
+        return df.loc[:5]
+        # server immer noch 0:5, lokal schon 10:15 geladen
+        # anschliessend wieder wechseln auf
+        # return matches_updates
+    
+    @task()
+    def cleanse_scores(load_fixtures):
+        scores_df = fb_stats.transform_scores(load_fixtures)
+
+        table_name = 'postgres_db.scores'
+        # cursor.sql("DROP TABLE IF EXISTS postgres_db.fixtures;")
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM scores_df;")
+        # cursor.sql(f"COPY {table_name} FROM scores_df;")
 
         return scores_df
 
-    @task()
-    def load_fixtures(cleanse_fixtures):
-        df = cleanse_fixtures
-        cursor.sql("DROP TABLE IF EXISTS postgres_db.fixtures;")
-        cursor.sql("CREATE TABLE postgres_db.fixtures AS SELECT * FROM df;")
-
-        print(cursor.sql('SELECT * FROM df LIMIT 5;'))
-
 
     @task()
-    def get_match_details(cleanse_fixtures):
-        df = cleanse_fixtures
-        match_details = func.get_match_details(df)
+    def get_match_details(load_fixtures):
+        df = load_fixtures
+        match_details = fb_stats.get_match_details(df)
 
         return match_details
 
     @task()
     def load_gk_stats(get_match_details):
         gk_stats = get_match_details[1]
+        
+        table_name = 'postgres_db.goalkeeper_stats'
+        #cursor.sql(f"SELECT * FROM {table_name} UNION SELECT * FROM gk_stats;")
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM gk_stats;")
+        # cursor.sql(f"COPY {table_name} FROM gk_stats;")
 
-        cursor.sql("CREATE TABLE postgres_db.goalkeeper_stats AS SELECT * FROM gk_stats;")
-
-        print(cursor.sql('SELECT * FROM gk_stats LIMIT 5;'))
+        print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
   
     @task()
     def load_shots(get_match_details):
         shots = get_match_details[0]
 
-        cursor.sql("CREATE TABLE postgres_db.shots AS SELECT * FROM shots;")
+        table_name = 'postgres_db.shots'
+        #cursor.sql(f"SELECT * FROM {table_name} UNION SELECT * FROM shots;")
+        cursor.sql(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM shots;")
+        # cursor.sql(f"COPY {table_name} FROM shots;")
 
-        print(cursor.sql('SELECT * FROM shots LIMIT 5;'))
+        print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
 
 
     get_data = extract_fixtures()
-    clean_scores = cleanse_fixtures(get_data)
-    clean_matchdetails = get_match_details(clean_scores)
-    insert_scores = load_fixtures(clean_scores)
+    insert_teams = load_teams(get_data)
+    insert_fixtures = load_fixtures(get_data)
+    clean_scores = cleanse_scores(insert_fixtures)
+    clean_matchdetails = get_match_details(insert_fixtures)
     insert_gk_stats = load_gk_stats(clean_matchdetails)
     insert_shots = load_shots(clean_matchdetails)
 
