@@ -69,7 +69,8 @@ class fbrefStats:
 
         # Column [Round] is not present for every competition. Fill the column with a default value if non is existent
         if 'round' not in fixtures.columns:
-            fixtures['round'] = 'Regular Season'
+            #fixtures['round'] = 'Regular Season'
+            fixtures.insert(loc=0, column='round', value='Regular Season')
         
         return fixtures
 
@@ -79,6 +80,8 @@ class fbrefStats:
         away = df[['away_id', 'away', 'inserted_timestamp']].rename(columns={'away': 'team_name', 'away_id': 'team_id'})
 
         teams = pd.concat([home, away], axis=0)
+        teams = teams.drop_duplicates(subset='team_id').copy().reset_index().drop(columns='index')
+        teams['team_name'] = [x[0] for x in teams['team_name'].str.rsplit(' ')]
 
         return teams
 
@@ -86,8 +89,8 @@ class fbrefStats:
         scores = df.dropna(subset=['score']).copy()
 
         # Split the score
-        scores['score_home'] = [sum([int(y) for y in x[0].replace(")","").replace("(","").split(" ")]) for x in scores['score'].str.split('–')]
-        scores['score_away'] = [sum([int(y) for y in x[1].replace(")","").replace("(","").split(" ")]) for x in scores['score'].str.split('–')]
+        scores['score_home'] = [x[0].split(" ")[-1] for x in df['score'].str.split('–')]
+        scores['score_away'] = [x[1].split(" ")[0] for x in df['score'].str.split('–')]
         scores['score_home'] = scores['score_home'].astype(int)
         scores['score_away'] = scores['score_away'].astype(int)
         scores = scores.drop(columns=['score']).copy()
@@ -96,10 +99,10 @@ class fbrefStats:
         scores['notes'] = np.where(scores['notes'].str.contains('penalty', regex=False) == True, 'Penalty Shootout', scores['notes'])
 
         # Rename columns
-        scores_home = scores[['url', 'match_id', 'competition', 'season', 'wk', 'day', 'date', 'time',
-                          'home_id', 'away', 'score_home', 'score_away', 'xg', 'xg.1', 'inserted_timestamp']].copy()
-        scores_away = scores[['url', 'match_id', 'competition', 'season', 'wk', 'day', 'date', 'time', 
-                              'away_id', 'home', 'score_away', 'score_home', 'xg.1', 'xg', 'inserted_timestamp']].copy()
+        scores_home = scores[['url', 'match_id', 'competition', 'season', 'round', 'wk', 'day', 'date', 'time',
+                          'home_id', 'away', 'score_home', 'score_away', 'xg', 'xg.1', 'notes', 'inserted_timestamp']].copy()
+        scores_away = scores[['url', 'match_id', 'competition', 'season', 'round', 'wk', 'day', 'date', 'time', 
+                              'away_id', 'home', 'score_away', 'score_home', 'xg.1', 'xg', 'notes', 'inserted_timestamp']].copy()
 
         scores_home.rename(columns={'home_id': 'team_id', 'away': 'opponent', 'score_home': 'score', 
                             'score_away': 'score_opp', 'xg.1': 'xg_opp'}, inplace=True)
@@ -130,7 +133,7 @@ class fbrefStats:
 
         ### Extraction
         # Loop through last recorded games to extract match_details
-        for i in range(len(df)):
+        for i, row in df.iterrows():
             # Declare variables match_id and url
             match_id = df['match_id'][i]
             url = df['url'][i]
@@ -141,7 +144,7 @@ class fbrefStats:
 
 
             ### Extract goalkeeper statistics from both goalkeeper
-            gk_columns = ['player', 'nation', 'age', 'min', 'shots', 'goals',
+            gk_columns = ['player', 'age', 'min', 'shots', 'goals',
             'saves', 'save_perc', 'psxg', 'launch_completion', 
             'launch_attempts', 'launch_comp_percentage', 
             'pass_attempt', 'throws', 'launch_percentage', 
@@ -149,22 +152,19 @@ class fbrefStats:
             'goalkicks_average_length', 'crosses', 'crosses_stopped', 
             'crosses_stopped_percentage', 'actions_outside_penaltyarea', 'actions_average_distance']
             
-            # Create home goalkeeper dataframe
+            # Create home goalkeeper dataframe and drop nation column
             gk1_exp = html_output[9].explode(list(html_output[9].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
             gk1_output = gk1_exp.groupby(gk1_exp.index).first()
-            # Column [Nation] is not present for every competition. Fill the column with None if non is existent
-            if 'Nation' not in gk1_output.columns:
-                gk1_output['Nation'] = np.nan
             
-            # Create away goalkeeper dataframe
+            # Create away goalkeeper dataframe and drop nation column
             gk2_exp = html_output[16].explode(list(html_output[16].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
             gk2_output = gk2_exp.groupby(gk2_exp.index).first()
-            # Column [Nation] is not present for every competition. Fill the column with None if non is existent
-            if 'Nation' not in gk2_output.columns:
-                gk2_output['Nation'] = np.nan
 
             # Combine home and away GK dataframes
             gk_all_output = pd.concat([gk1_output, gk2_output])
+            gk_all_output.columns = gk_all_output.columns.map(lambda x: x[1])
+            gk_all_output = gk_all_output.drop(columns=['Nation'])
+            gk_all_output = gk_all_output.reset_index().drop(columns='index')
             gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
             
             # Add match_id and append to overall dataframe
@@ -214,7 +214,6 @@ class fbrefStats:
 
         shots['notes'] = notes_list
         shots['player'] = [x[0] for x in shots['player'].str.rsplit("(")] # Player
-        shots['squad'] = shots['squad'].map(lambda x: x.split(' ')[1])
         shots['competition'] = competition
         shots['season'] = season
 

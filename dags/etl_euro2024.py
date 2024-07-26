@@ -4,6 +4,7 @@ import duckdb
 import http.client
 from datetime import datetime, timedelta
 import functions.fbref_functions as func
+from functions.kdrive_functions import kDrive
 import tempfile
 import os
 
@@ -30,10 +31,7 @@ def ProcessScores():
     
     # Define drive connection
     drive_conn = BaseHook.get_connection('kdrive')
-    headers = {
-    'Authorization': 'Bearer ' + drive_conn.password,
-    'Content-Type': 'application/octet-stream',
-    }
+    kdrive = kDrive(drive_conn)
 
     # Initialize duckdb with postgres connector    
     cursor = duckdb.connect()
@@ -51,23 +49,9 @@ def ProcessScores():
 
         df = fb_stats.get_fixtures()
 
-        custom_file_name = 'euro2024_fixtures.csv'
+        custom_file_name = 'euro2024_fixtures.parquet'
         
-        with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
-            df.to_csv(temp.name, index=False)
-
-            with open(temp.name, 'rb') as f:
-                file = f.read()
-            file_size = os.path.getsize(temp.name)
-
-            print('Filename: ' + temp.name)
-            print('Filesize: ' + str(file_size))
-
-            conn = http.client.HTTPSConnection(drive_conn.host)
-            conn.request("POST", f'{drive_conn.schema}/upload?total_size={file_size}&directory_id=5385&file_name={custom_file_name}&conflict=version', file, headers)
-            res = conn.getresponse()
-            data = res.read()
-            print(data.decode("utf-8"))
+        kdrive.upload_parquet(df, custom_file_name)
 
         return df
     
@@ -90,7 +74,7 @@ def ProcessScores():
         matches_insert = cursor.sql(f"INSERT INTO {table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM {table_name});")
         print(cursor.sql(f'SELECT count(*) FROM matches_updates;'))
         
-        return df.loc[5:10]
+        return df.loc[:5]
         # server immer noch 5:10, lokal schon 10:15 geladen
         # anschliessend wieder wechseln auf
         # return matches_updates
@@ -138,11 +122,11 @@ def ProcessScores():
 
 
     get_data = extract_fixtures()
-    insert_teams = load_teams(get_data)
-    insert_fixtures = load_fixtures(get_data)
-    clean_scores = cleanse_scores(insert_fixtures)
-    clean_matchdetails = get_match_details(insert_fixtures)
-    insert_gk_stats = load_gk_stats(clean_matchdetails)
-    insert_shots = load_shots(clean_matchdetails)
+    # insert_teams = load_teams(get_data)
+    # insert_fixtures = load_fixtures(get_data)
+    # clean_scores = cleanse_scores(insert_fixtures)
+    # clean_matchdetails = get_match_details(insert_fixtures)
+    # insert_gk_stats = load_gk_stats(clean_matchdetails)
+    # insert_shots = load_shots(clean_matchdetails)
 
 ProcessScores()
