@@ -15,13 +15,14 @@ from airflow.hooks.base import BaseHook
 
 default_args = {
     'owner': 'MH',
-    'start_date': datetime(2024, 4, 25),
+    'start_date': datetime(2024, 8, 19),
+    'schedule':"0 11 * * 1",
     'retries': 0
     # You can add more default arguments here as needed
 }
 
 # Define Postgres DB connection
-postgres_conn = BaseHook.get_connection('postgres_integrated')
+postgres_conn = BaseHook.get_connection('postgres-sport-analytics-db')
 
 # Initialize duckdb with postgres connector    
 # cursor = duckdb.connect('/opt/airflow/data/mls.db')
@@ -31,8 +32,8 @@ cursor.sql("LOAD postgres;")
 cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
 
 @dag(
-    dag_id="etl_mls",
-    start_date=datetime(2024, 6, 10),
+    dag_id="etl_2bundesliga",
+    start_date=datetime(2024, 7, 30),
     schedule="0 5 * * 1",
     catchup=False,
     default_args=default_args,
@@ -46,7 +47,7 @@ def ProcessScores():
     }
 
     # Define competition url and name    
-    competition_url = 'https://fbref.com/en/comps/22/history/Major-League-Soccer-Seasons'
+    competition_url = 'https://fbref.com/en/comps/33/history/2-Bundesliga-Seasons'
     fb_stats = func.fbrefStats(competition_url)
 
     # 1. task to load data from the URL into a duckdb table
@@ -55,7 +56,7 @@ def ProcessScores():
 
         df = fb_stats.get_fixtures()
 
-        custom_file_name = 'mls_fixtures.csv'
+        custom_file_name = '2bundesliga_fixtures.csv'
         
         with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
             df.to_csv(temp.name, index=False)
@@ -97,12 +98,12 @@ def ProcessScores():
     
     @task()
     def cleanse_scores(load_fixtures):
-        scores_df = fb_stats.transform_scores(load_fixtures)
+        scores = fb_stats.transform_scores(load_fixtures)
 
         table_name = 'scores'
         cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM scores WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
 
-        return scores_df
+        print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
 
 
     @task()
@@ -127,6 +128,8 @@ def ProcessScores():
 
         table_name = 'shots'
         cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM shots WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
+
+        cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};')
 
 
     get_data = extract_fixtures()

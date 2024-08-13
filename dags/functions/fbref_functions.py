@@ -123,102 +123,111 @@ class fbrefStats:
 
 
     def get_match_details(self, df):
-        competition_dict = self.get_latest_season()
-        season = competition_dict['season']
-        competition = competition_dict['competition']
-        
-        # Initiate empty Dataframes
-        shots = pd.DataFrame()
-        gk_stats = pd.DataFrame()
+        ### Extract goalkeeper statistics from both goalkeeper
+        gk_columns = ['player', 'age', 'min', 'shots', 'goals',
+                    'saves', 'save_perc', 'psxg', 'launch_completion', 
+                    'launch_attempts', 'launch_comp_percentage', 
+                    'pass_attempt', 'throws', 'launch_percentage', 
+                    'pass_average_length', 'goalkicks', 'goalkicks_launched_percentage',
+                    'goalkicks_average_length', 'crosses', 'crosses_stopped', 
+                    'crosses_stopped_percentage', 'actions_outside_penaltyarea', 
+                    'actions_average_distance', 'match_id', 'competition', 'season']
 
-        ### Extraction
-        # Loop through last recorded games to extract match_details
-        for i, row in df.iterrows():
-            # Declare variables match_id and url
-            match_id = df['match_id'][i]
-            url = df['url'][i]
-            home_team = df['home_id'][i]
+        shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 'outcome', 
+                        'distance', 'bodypart', 'notes', 'assist_player1', 
+                        'assist1', 'assist_player2', 'assist2', 'team_id', 
+                        'match_id', 'goalkeeper', 'competition', 'season']
 
-            # Read html output from match url
-            html_output = pd.read_html(url, extract_links='body')
-
-
-            ### Extract goalkeeper statistics from both goalkeeper
-            gk_columns = ['player', 'age', 'min', 'shots', 'goals',
-            'saves', 'save_perc', 'psxg', 'launch_completion', 
-            'launch_attempts', 'launch_comp_percentage', 
-            'pass_attempt', 'throws', 'launch_percentage', 
-            'pass_average_length', 'goalkicks', 'goalkicks_launched_percentage',
-            'goalkicks_average_length', 'crosses', 'crosses_stopped', 
-            'crosses_stopped_percentage', 'actions_outside_penaltyarea', 'actions_average_distance']
+        if df.empty:
+            shots = pd.DataFrame(columns=shot_columns)
+            gk_stats = pd.DataFrame(columns=gk_columns)
+        else:
+            competition_dict = self.get_latest_season()
+            season = competition_dict['season']
+            competition = competition_dict['competition']
             
-            # Create home goalkeeper dataframe and drop nation column
-            gk1_exp = html_output[9].explode(list(html_output[9].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
-            gk1_output = gk1_exp.groupby(gk1_exp.index).first()
-            
-            # Create away goalkeeper dataframe and drop nation column
-            gk2_exp = html_output[16].explode(list(html_output[16].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
-            gk2_output = gk2_exp.groupby(gk2_exp.index).first()
+            # Initiate empty Dataframes
+            shots = pd.DataFrame()
+            gk_stats = pd.DataFrame()
 
-            # Combine home and away GK dataframes
-            gk_all_output = pd.concat([gk1_output, gk2_output])
-            gk_all_output.columns = gk_all_output.columns.map(lambda x: x[1])
-            gk_all_output = gk_all_output.drop(columns=['Nation'])
-            gk_all_output = gk_all_output.reset_index().drop(columns='index')
-            gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
-            
-            # Add match_id and append to overall dataframe
-            gk_all_output['match_id'] = match_id
-            gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
-            
-            # Define home and away goalkeeper name for shots
-            home_goalkeeper = gk1_output.iloc[0, 0]
-            away_goalkeeper = gk2_output.iloc[0, 0]
+            ### Extraction
+            # Loop through last recorded games to extract match_details
+            for i, row in df.iterrows():
+                # Declare variables match_id and url
+                match_id = df['match_id'][i]
+                url = df['url'][i]
+                home_team = df['home_id'][i]
 
-            ### Extract shot statistics from match_detail
-            shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 
-                            'outcome', 'distance', 'bodypart', 'notes', 
-                            'assist_player1', 'assist1', 'assist_player2', 'assist2']
-            shot_exp = html_output[-3].explode(list(html_output[-3].columns))
-            shot_exp[shot_exp.columns[1]] = shot_exp[shot_exp.columns[1]].replace('', np.nan)
-            shot_exp[shot_exp.columns[-2]] = shot_exp[shot_exp.columns[-2]].replace('', np.nan)
-            shot_exp[shot_exp.columns[-4]] = shot_exp[shot_exp.columns[-4]].replace('', np.nan)
-            shot_exp.dropna(subset=[shot_exp.columns[1]], inplace=True)
-            shot_output = shot_exp.groupby(shot_exp.index).first()
-            shot_output = shot_output.set_axis(shot_columns, axis=1)
-            shot_output.dropna(subset=['minute'], inplace=True)
+                # Read html output from match url
+                html_output = pd.read_html(url, extract_links='body')
 
-            # Extract the team id
-            shot_ids = shot_exp.groupby(shot_exp.index).last()
-            shot_output['team_id'] = [x[0].split('/en/squads/')[1] for x in shot_ids.iloc[:, 2].str.rsplit('/', n=1)]
+                # Create home goalkeeper dataframe and drop nation column
+                gk1_exp = html_output[9].explode(list(html_output[9].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+                gk1_output = gk1_exp.groupby(gk1_exp.index).first()
+                
+                # Create away goalkeeper dataframe and drop nation column
+                gk2_exp = html_output[16].explode(list(html_output[16].columns)).drop(["('Unnamed: 1_level_0', 'Nation')"], axis=1, errors='ignore')
+                gk2_output = gk2_exp.groupby(gk2_exp.index).first()
 
-            # Add match_id and goalkeeper  column
-            shot_output['match_id'] = match_id
-            shot_output['goalkeeper'] = np.where(shot_output['team_id'] == home_team, away_goalkeeper, home_goalkeeper)
+                # Combine home and away GK dataframes
+                gk_all_output = pd.concat([gk1_output, gk2_output])
+                gk_all_output.columns = gk_all_output.columns.map(lambda x: x[1])
+                gk_all_output = gk_all_output.drop(columns=['Nation'])
+                gk_all_output = gk_all_output.reset_index().drop(columns='index')
+                gk_all_output = gk_all_output.set_axis(gk_columns, axis=1)
+                
+                # Add match_id and append to overall dataframe
+                gk_all_output['match_id'] = match_id
+                gk_stats = pd.concat([gk_stats, gk_all_output]).reset_index().drop(columns=['index'])
+                
+                # Define home and away goalkeeper name for shots
+                home_goalkeeper = gk1_output.iloc[0, 0]
+                away_goalkeeper = gk2_output.iloc[0, 0]
 
-            # Add transformed rows to shot dataframe
-            shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
+                ### Extract shot statistics from match_detail
+                shot_columns = ['minute', 'player', 'squad', 'xg', 'psxg', 
+                                'outcome', 'distance', 'bodypart', 'notes', 
+                                'assist_player1', 'assist1', 'assist_player2', 'assist2']
+                shot_exp = html_output[-3].explode(list(html_output[-3].columns))
+                shot_exp[shot_exp.columns[1]] = shot_exp[shot_exp.columns[1]].replace('', np.nan)
+                shot_exp[shot_exp.columns[-2]] = shot_exp[shot_exp.columns[-2]].replace('', np.nan)
+                shot_exp[shot_exp.columns[-4]] = shot_exp[shot_exp.columns[-4]].replace('', np.nan)
+                shot_exp.dropna(subset=[shot_exp.columns[1]], inplace=True)
+                shot_output = shot_exp.groupby(shot_exp.index).first()
+                shot_output = shot_output.set_axis(shot_columns, axis=1)
+                shot_output.dropna(subset=['minute'], inplace=True)
 
-        ### Cleaning
-        # Remove Added time from the Minute column 45/90 is the max
-        shots['minute'] = [x[0] for x in shots['minute'].astype(str).str.split('+')]
-        shots['minute'] = shots['minute'].astype(float).astype(int)
+                # Extract the team id
+                shot_ids = shot_exp.groupby(shot_exp.index).last()
+                shot_output['team_id'] = [x[0].split('/en/squads/')[1] for x in shot_ids.iloc[:, 2].str.rsplit('/', n=1)]
 
-        # Remove Penalty note from Player and add to Notes column
-        notes_list = []
-        for i in range(len(shots)):
-            if shots.loc[i]['player'].rsplit("(")[-1] == 'pen)':
-                notes_list.append('Penalty')
-            else:
-                notes_list.append(shots.loc[i]['notes'])
+                # Add match_id and goalkeeper  column
+                shot_output['match_id'] = match_id
+                shot_output['goalkeeper'] = np.where(shot_output['team_id'] == home_team, away_goalkeeper, home_goalkeeper)
 
-        shots['notes'] = notes_list
-        shots['player'] = [x[0] for x in shots['player'].str.rsplit("(")] # Player
-        shots['competition'] = competition
-        shots['season'] = season
+                # Add transformed rows to shot dataframe
+                shots = pd.concat([shots, shot_output]).reset_index().drop(columns=['index'])
 
-        # Add competition to goalkeeper stats
-        gk_stats['competition'] = competition
-        gk_stats['season'] = season
+            ### Cleaning
+            # Remove Added time from the Minute column 45/90 is the max
+            shots['minute'] = [x[0] for x in shots['minute'].astype(str).str.split('+')]
+            shots['minute'] = shots['minute'].astype(float).astype(int)
+
+            # Remove Penalty note from Player and add to Notes column
+            notes_list = []
+            for i in range(len(shots)):
+                if shots.loc[i]['player'].rsplit("(")[-1] == 'pen)':
+                    notes_list.append('Penalty')
+                else:
+                    notes_list.append(shots.loc[i]['notes'])
+
+            shots['notes'] = notes_list
+            shots['player'] = [x[0] for x in shots['player'].str.rsplit("(")] # Player
+            shots['competition'] = competition
+            shots['season'] = season
+
+            # Add competition to goalkeeper stats
+            gk_stats['competition'] = competition
+            gk_stats['season'] = season
 
         return shots, gk_stats
