@@ -15,13 +15,12 @@ from airflow.hooks.base import BaseHook
 
 default_args = {
     'owner': 'MH',
-    'start_date': datetime(2024, 4, 25),
-    'retries': 0
+    'retries': 0,
     # You can add more default arguments here as needed
 }
 
 # Define Postgres DB connection
-postgres_conn = BaseHook.get_connection('postgres_integrated')
+postgres_conn = BaseHook.get_connection('postgres-sport-analytics-db')
 
 # Initialize duckdb with postgres connector    
 # cursor = duckdb.connect('/opt/airflow/data/mls.db')
@@ -32,9 +31,10 @@ cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgr
 
 @dag(
     dag_id="etl_mls",
-    start_date=datetime(2024, 6, 10),
-    schedule="0 5 * * 1",
+    start_date=datetime(2024, 10, 2),
+    schedule="0 4 * * 0,1,4",
     catchup=False,
+    tags=['Football'],
     default_args=default_args,
 )
 def ProcessScores(): 
@@ -92,23 +92,29 @@ def ProcessScores():
         cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM df WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
 
         print(f"{matches_updates.count()} new matches have been extracted" )
-        
-        return matches_updates
     
     @task()
-    def cleanse_scores(load_fixtures):
-        scores_df = fb_stats.transform_scores(load_fixtures)
-
+    def cleanse_scores(extract_fixtures):
+        scores = fb_stats.transform_scores(extract_fixtures)
         table_name = 'scores'
-        cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM scores WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
+        scores_updates = cursor.sql(f"SELECT * FROM scores WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
+        cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM scores_updates;")
 
-        return scores_df
+        print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
 
 
     @task()
-    def get_match_details(load_fixtures):
-        df = load_fixtures
-        match_details = fb_stats.get_match_details(df)
+    def get_match_details(extract_fixtures):
+        df = extract_fixtures
+        match_updates = cursor.sql("""  
+                                    SELECT * 
+                                    FROM df 
+                                    WHERE match_id NOT IN (SELECT match_id FROM postgres_db.gk_stats)
+                                    OR match_id NOT IN (SELECT match_id FROM postgres_db.shots);
+                                   """).to_df()
+        # Reduce input dataframe to max 6 matches, because of Request limits
+        match_updateset = match_updates.iloc[:6]
+        match_details = fb_stats.get_match_details(match_updateset)
 
         return match_details
 
@@ -128,12 +134,14 @@ def ProcessScores():
         table_name = 'shots'
         cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM shots WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
 
+        cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};')
+
 
     get_data = extract_fixtures()
     insert_teams = load_teams(get_data)
     insert_fixtures = load_fixtures(get_data)
-    clean_scores = cleanse_scores(insert_fixtures)
-    clean_matchdetails = get_match_details(insert_fixtures)
+    clean_scores = cleanse_scores(get_data)
+    clean_matchdetails = get_match_details(get_data)
     insert_gk_stats = load_gk_stats(clean_matchdetails)
     insert_shots = load_shots(clean_matchdetails)
 

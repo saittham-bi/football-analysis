@@ -30,10 +30,9 @@ cursor.sql("LOAD postgres;")
 cursor.sql(f"ATTACH 'dbname=football user={postgres_conn.login} password={postgres_conn.password} host={postgres_conn.host}' AS postgres_db (TYPE POSTGRES);")
 
 @dag(
-    dag_id="etl_bundesliga",
+    dag_id="etl_championsleague",
     start_date=datetime(2024, 10, 2),
-    schedule="0 22 * * 1,2,4",
-    catchup=False,
+    schedule="0 2 * * 5",
     tags=['Football'],
     default_args=default_args,
 )
@@ -46,7 +45,7 @@ def ProcessScores():
     }
 
     # Define competition url and name    
-    competition_url = 'https://fbref.com/en/comps/20/history/Bundesliga-Seasons'
+    competition_url = 'https://fbref.com/en/comps/8/history/Champions-League-Seasons'
     fb_stats = func.fbrefStats(competition_url)
 
     # 1. task to load data from the URL into a duckdb table
@@ -55,7 +54,7 @@ def ProcessScores():
 
         df = fb_stats.get_fixtures()
 
-        custom_file_name = 'bundesliga_fixtures.csv'
+        custom_file_name = 'championsleague_fixtures.csv'
         
         with tempfile.NamedTemporaryFile(mode='w', delete=True, prefix=custom_file_name) as temp:
             df.to_csv(temp.name, index=False)
@@ -97,8 +96,9 @@ def ProcessScores():
     def cleanse_scores(extract_fixtures):
         scores = fb_stats.transform_scores(extract_fixtures)
         table_name = 'scores'
-        scores_updates = cursor.sql(f"SELECT * FROM scores WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
-        cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM scores_updates;")
+        cursor.sql(f"DELETE FROM postgres_db.{table_name} WHERE competition = 'UEFA Champions League';")
+        # scores_updates = cursor.sql(f"SELECT * FROM scores WHERE match_id NOT IN (SELECT match_id FROM postgres_db.{table_name});")
+        cursor.sql(f"INSERT INTO postgres_db.{table_name} SELECT * FROM scores;")
 
         print(cursor.sql(f'SELECT count(*) AS total_zeilen FROM {table_name};'))
 
