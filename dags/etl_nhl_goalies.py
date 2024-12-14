@@ -66,22 +66,58 @@ def SaveStatistics():
     def save_stats_to_db(get_data):
         ids = kdrive.files_in_directory(file_directory)
         goalie_stats = pd.DataFrame()
+        cursor.sql("""
+                   CREATE TEMP TABLE goalie_input (
+                   player VARCHAR NOT NULL,
+                   age INTEGER NOT NULL,
+                   team VARCHAR NOT NULL,
+                   games_played INTEGER NOT NULL,
+                   games_started INTEGER NULL,
+                   wins INTEGER NOT NULL,
+                   losses INTEGER NOT NULL,
+                   ties INTEGER NOT NULL,
+                   goals_against INTEGER NOT NULL,
+                   shots INTEGER NOT NULL,
+                   saves INTEGER NOT NULL,
+                   shutouts INTEGER NOT NULL,
+                   minutes_played FLOAT NOT NULL
+                   );
+                   """)
         for id in ids:
+            print(id)
             input_df = kdrive.read_files(filetype='parquet', file_id=id)
-            if 'Tm' in input_df.columns:
-                input_df = input_df.rename(columns={'Tm': 'Team'})
-            input_df = input_df[['Rk', 'Player', 'Age', 'Team', 'GP', 'GS', 'W', 'L', 'T/O', 'GA', 'SA',
-                                'SV', 'GAA', 'SO', 'GPS', 'MIN', 'QS', 'RBS', 'GA%-']]
-            goalie_stats = pd.concat([goalie_stats, input_df])
-
-        goalie_stats = goalie_stats.iloc[:, :22].copy()
-        goalie_stats.drop_duplicates(inplace=True)
+            input_df.columns = map(str.lower, input_df.columns)
+            input_df.rename(columns={'tm': 'team', 'sa': 'shots', 'Test': 'test'}, inplace=True)
+            cursor.sql("""
+                       INSERT INTO goalie_input
+                       SELECT CAST(player AS varchar) AS player,
+                        CAST(age AS INTEGER) AS age,
+                        CAST(team AS VARCHAR) AS team,
+                        CAST(gp AS INTEGER) AS games_played,
+                        CAST(gs AS INTEGER) AS games_started,
+                        CAST(w AS INTEGER) AS wins,
+                        CAST(l AS INTEGER) AS losses,
+                        CAST("T/O" AS INTEGER) AS ties,
+                        CAST(ga AS INTEGER) goals_against,
+                        CAST(shots AS INTEGER) AS shots,
+                        CAST(sv AS INTEGER) AS saves,
+                        CAST(so AS INTEGER) shutouts,
+                        CAST(SPLIT_PART(min, ':', 1) AS FLOAT) + CAST(CAST(right(min, 2) AS integer) / 60 AS FLOAT) AS minutes_played
+                       FROM input_df 
+                       WHERE player NOT IN ('Player', 'League Average');
+                       """)
+                
+        #     goalie_stats = pd.concat([goalie_stats, input_df])
 
         table_name = 'postgres_db.goalie_stats'
+        # goalie_stats = goalie_stats[['player', 'age', 'team', 'gp', 'gs', 'w', 'l', 'T/O', 'ga', 'shots', 'sv', 'so', 'min']].copy()
+        # goalie_stats.drop_duplicates(inplace=True)
+
         cursor.sql(f"DELETE FROM {table_name};")
-        cursor.sql(f"INSERT INTO {table_name} SELECT * FROM goalie_stats;")
-        # cursor.sql(f"CREATE TABLE {table_name} AS SELECT * FROM goalie_stats;")
-        print(f'Full replaced goalie_stats with {len(goalie_stats)} rows')
+        cursor.sql(f"INSERT INTO {table_name} SELECT DISTINCT * FROM goalie_input;")
+        # cursor.sql(f"DROP TABLE {table_name};")
+        # cursor.sql(f"CREATE TABLE {table_name} AS SELECT * FROM goalie_input;")
+        # print(f'Full replaced goalie_stats with {len(goalie_stats)} rows')
 
     get_data = extract_stats_to_file()
     write_full = save_stats_to_db(get_data)
