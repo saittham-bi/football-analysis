@@ -84,6 +84,20 @@ class kDrive():
             return id_list
         else:
             return r.json()['error']['code']
+        
+    def return_filename(self, file_id):
+        header = self.create_header()
+
+        schema = self.conn.schema
+        version = '2'
+        extra = self.conn.extra
+        kdrive_id = json.loads(extra)['kdrive_id']
+
+        url=f'{schema}{version}/drive/{kdrive_id}/files/{file_id}'
+        r = requests.get(url=url, headers=header)
+        filename = r.json()['data']['name']
+
+        return filename
             
     def read_files(self, filetype, file_id):
         header = self.create_header()
